@@ -1,0 +1,155 @@
+// Beispielparameter: "17.06.2024 20:00 Geburtstag" oder "17.06.2024 Geburtstag" oder "17.06.2024"
+
+// Create a widget
+let widget = new ListWidget();
+widget.backgroundColor = new Color("#000000");
+
+// Parse date, time, and name from widget parameter
+let paramString = args.widgetParameter || "17.06.2024";
+let [datePart, ...timeAndNameParts] = paramString.split(" ");
+let [day, month, year] = datePart.split(".");
+let timePart = timeAndNameParts.length > 0 && timeAndNameParts[0].includes(":") ? timeAndNameParts[0] : "00:00";
+let nameParts = timeAndNameParts.length > 0 && !timeAndNameParts[0].includes(":") ? timeAndNameParts : timeAndNameParts.slice(1);
+let [hour, minute] = timePart.split(":");
+let countdownName = nameParts.join(" ");
+
+// Ensure day, month, hour, and minute are two digits
+day = day.padStart(2, '0');
+month = month.padStart(2, '0');
+hour = hour.padStart(2, '0');
+minute = minute.padStart(2, '0');
+
+let targetDate;
+
+try {
+  targetDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+  if (isNaN(targetDate.getTime())) {
+    throw new Error("Invalid date");
+  }
+} catch (e) {
+  let errorText = widget.addText("🤪 Ungültiger Parameter");
+  errorText.textColor = Color.red();
+  errorText.font = Font.boldSystemFont(18);
+  errorText.centerAlignText();
+  Script.setWidget(widget);
+  Script.complete();
+  return;
+}
+
+// Function to get clock emoji based on time
+function getClockEmoji(hour, minute) {
+  const hourHand = hour % 12;
+  const minuteHand = minute >= 30 ? "30" : "00";
+  const emojiMap = {
+    "0:00": "🕛", "0:30": "🕧",
+    "1:00": "🕐", "1:30": "🕜",
+    "2:00": "🕑", "2:30": "🕝",
+    "3:00": "🕒", "3:30": "🕞",
+    "4:00": "🕓", "4:30": "🕟",
+    "5:00": "🕔", "5:30": "🕠",
+    "6:00": "🕕", "6:30": "🕡",
+    "7:00": "🕖", "7:30": "🕢",
+    "8:00": "🕗", "8:30": "🕣",
+    "9:00": "🕘", "9:30": "🕤",
+    "10:00": "🕙", "10:30": "🕥",
+    "11:00": "🕚", "11:30": "🕦"
+  };
+  return emojiMap[`${hourHand}:${minuteHand}`];
+}
+
+// Function to update the countdown
+function updateCountdown() {
+  let now = new Date();
+  let timeDiff = targetDate - now;
+
+  if (timeDiff <= 0) {
+    let expiredText = widget.addText("Countdown abgelaufen!");
+    expiredText.textColor = Color.red();
+    expiredText.font = Font.thinSystemFont(18);
+    expiredText.centerAlignText();
+    return;
+  }
+
+  let days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+  let hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  let minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+
+  let dayText = days === 1 ? "Tag" : countdownName ? "Tagen" : "Tage";
+  let hourText = hours === 1 ? "Stunde" : "Stunden";
+  let minuteText = minutes === 1 ? "Minute" : "Minuten";
+
+  let nameTextStr = "";
+  if (days < 2) {
+    nameTextStr += "🎉 ";
+  }
+  if (countdownName) {
+    nameTextStr += `${countdownName} in:`;
+  }
+
+  if (nameTextStr) {
+    let nameText = widget.addText(nameTextStr);
+    nameText.textColor = Color.white();
+    if (config.widgetFamily === "small") {
+      nameText.font = Font.boldSystemFont(14);
+    } else if (config.widgetFamily === "medium") {
+      nameText.font = Font.boldSystemFont(18);
+    } else if (config.widgetFamily === "large") {
+      nameText.font = Font.boldSystemFont(22);
+    }
+    nameText.centerAlignText();
+    widget.addSpacer(8);
+  }
+
+  let clockEmoji = getClockEmoji(parseInt(hour), parseInt(minute));
+
+  if (config.widgetFamily === "small") {
+    let textDays = widget.addText(`📅 ${days} ${dayText}`);
+    textDays.textColor = Color.white();
+    textDays.font = Font.thinSystemFont(16);
+    textDays.centerAlignText();
+
+    if (hour !== "00" || minute !== "00") {
+      widget.addSpacer(4);
+
+      let textHours = widget.addText(`${clockEmoji} ${hours} ${hourText}`);
+      textHours.textColor = Color.white();
+      textHours.font = Font.thinSystemFont(16);
+      textHours.centerAlignText();
+
+      let textMinutes = widget.addText(`${minutes} ${minuteText}`);
+      textMinutes.textColor = Color.white();
+      textMinutes.font = Font.thinSystemFont(16);
+      textMinutes.centerAlignText();
+    }
+  } else {
+    let countdownText = `📅 ${days} ${dayText}`;
+    if (hour !== "00" || minute !== "00") {
+      countdownText += `\n${clockEmoji} ${hours} ${hourText} ${minutes} ${minuteText}`;
+    }
+    let text = widget.addText(countdownText);
+    text.textColor = Color.white();
+
+    // Adjust font size based on widget size
+    if (config.widgetFamily === "medium") {
+      text.font = Font.thinSystemFont(22);
+    } else if (config.widgetFamily === "large") {
+      text.font = Font.thinSystemFont(28);
+    }
+    text.centerAlignText();
+  }
+}
+
+// Call the function to update the countdown
+updateCountdown();
+
+// Refresh widget every minute
+widget.refreshAfterDate = new Date(Date.now() + 60000);
+
+// Finalize the widget
+if (config.runsInWidget) {
+  Script.setWidget(widget);
+} else {
+  widget.presentMedium();
+}
+
+Script.complete();
